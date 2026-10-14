@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "open-climb",
+    "slug": "open-climb",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "openclimb",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "io.github.jacereid.openclimb",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "monochromeImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#18D1D6"
+      },
+      "predictiveBackGestureEnabled": false,
+      "icon": "./assets/images/icon-round.png"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/icon-round.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F3F6F5",
+          "image": "./assets/images/icon-round.png",
+          "imageWidth": 160,
+          "dark": {
+            "backgroundColor": "#0E1413",
+            "image": "./assets/images/icon-round.png"
+          }
+        }
+      ],
+      "expo-sqlite",
+      "expo-audio",
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": [
+              "arm64-v8a"
+            ],
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "useLegacyPackaging": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
