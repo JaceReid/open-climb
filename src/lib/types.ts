@@ -46,7 +46,7 @@ export const TRAINING_TYPE_LABELS: Record<TrainingType, string> = {
   power: 'Power',
   'power-endurance': 'Power endurance',
   endurance: 'Endurance',
-  technique: 'Technique',
+  technique: 'Climbing & technique',
   prehab: 'Prehab',
   mobility: 'Warm-up & mobility',
   other: 'Other',
@@ -75,8 +75,16 @@ export function defaultTrainingType(category: Category): TrainingType {
 }
 
 /** What gets recorded for each set of an exercise. */
-export const TRACK_FIELDS = ['weight', 'reps', 'duration', 'grade'] as const;
+export const TRACK_FIELDS = ['weight', 'reps', 'duration', 'grade', 'location', 'discipline'] as const;
 export type TrackField = (typeof TRACK_FIELDS)[number];
+export const TRACK_LABELS: Record<TrackField, string> = {
+  weight: 'Weight',
+  reps: 'Reps',
+  duration: 'Time',
+  grade: 'Grade',
+  location: 'Indoor/outdoor',
+  discipline: 'Route/boulder',
+};
 
 /** How an exercise is prescribed inside a workout. */
 export interface Prescription {
@@ -103,6 +111,8 @@ export interface Prescription {
   /** Grip type, e.g. "half crimp", "open hand". */
   grip?: string;
   notes?: string;
+  /** Per-set labels (e.g. grips), cycled across sets: set 3 of ["a", "b"] is "a". */
+  setLabels?: string[];
 }
 
 export interface Exercise {
@@ -199,10 +209,18 @@ export interface SetLog {
   durationSec: number | null;
   grade: string | null;
   completed: boolean;
+  /** Free text; holds the set's label (e.g. grip) when the prescription has setLabels. */
   notes: string;
   /** Estimated time for this set including its share of rests, from the prescription. */
   estSec: number | null;
+  location: Location | null;
+  discipline: Discipline | null;
 }
+
+export type Location = 'indoor' | 'outdoor';
+export type Discipline = 'boulder' | 'route';
+export const LOCATION_LABELS: Record<Location, string> = { indoor: 'Indoor', outdoor: 'Outdoor' };
+export const DISCIPLINE_LABELS: Record<Discipline, string> = { boulder: 'Bouldering', route: 'Routes' };
 
 export interface Settings {
   unit: 'kg' | 'lb';

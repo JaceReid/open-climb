@@ -1,10 +1,21 @@
-# open-climb
+<p align="center">
+  <img src="assets/images/icon-round.png" alt="open-climb icon" width="112" />
+</p>
+
+<h1 align="center">open-climb</h1>
 
 An open source climbing training app for your phone, in the spirit of Crimpd and Lattice. Plan training blocks, follow
 guided hangboard and strength timers, log what you did and watch your numbers go up. Write your plan with Claude (or
 any LLM) and load it straight into the app.
 
 All data stays on your device. No account, no server.
+
+<p align="center">
+  <img src="docs/screenshots/today.png" alt="Today: the active plan, this week's schedule and today's workout" width="200" />
+  <img src="docs/screenshots/progress.png" alt="Progress overview: training mix by type as a donut chart with a legend" width="200" />
+  <img src="docs/screenshots/performance.png" alt="Performance: top weight trend and change per strength exercise" width="200" />
+  <img src="docs/screenshots/max-test.png" alt="Max Hangs page: tested max and the 80% working weight" width="200" />
+</p>
 
 ## Features
 
@@ -22,6 +33,11 @@ All data stays on your device. No account, no server.
   max, converted to an estimated 1RM) with a built-in hold and rest timer. Workouts can prescribe load as "% of max"
   (e.g. 80%, of total load for hangs and pull-ups), and the weight fills in automatically. Test workouts can be
   scheduled in plans.
+- **Review & adapt with Claude:** "Adjust with Claude" shares your recent training log (sessions, sets, RPE, notes,
+  maxes, missed sessions) and your plan. Claude's reply updates the plan in place, keeping its start date and your
+  history.
+- **Open climbing & grip labels:** log ordinary climbing sessions (indoor/outdoor, routes/bouldering, time), and label
+  each set of an exercise (e.g. half crimp → front three → open hand) so the timer tells you which grip is next.
 - **Progress charts:** per-exercise charts of top added weight, total load as % of bodyweight, estimated 1RM
   (Epley), hardest Font grade, or longest effort. Tap a chart to inspect any point.
 - **Import from Claude:** see below.
@@ -81,6 +97,10 @@ npm test           # unit tests (vitest): import parser, timer, schedule, metric
 npm run typecheck  # tsc --noEmit
 npm run lint       # expo lint
 ```
+
+To try the app with realistic data (or refresh the README screenshots), run it in development and use
+**Settings → Developer → Load demo data**: it adds the example plan, ~8 weeks of sessions and max tests. The button only
+appears in development builds.
 
 The app icon has a single source, `assets/images/icon.png`. After changing it, run
 `python3 scripts/generate-icons.py` (needs Pillow). That regenerates the Android adaptive-icon foreground, the round

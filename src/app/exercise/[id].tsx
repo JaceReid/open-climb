@@ -11,9 +11,7 @@ import { deleteExercise, getExercise, resetExercise, workoutsUsingExercise } fro
 import { useQuery } from '@/db/store';
 import { useSettings } from '@/hooks/data';
 import { formatDetails, formatSetsReps } from '@/lib/format';
-import { CATEGORY_LABELS, TRAINING_TYPE_LABELS } from '@/lib/types';
-
-const TRACK_LABELS = { weight: 'Weight', reps: 'Reps', duration: 'Time', grade: 'Grade' } as const;
+import { CATEGORY_LABELS, TRACK_LABELS, TRAINING_TYPE_LABELS } from '@/lib/types';
 
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

@@ -9,7 +9,7 @@ import { useSettings } from '@/hooks/data';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDay } from '@/lib/dates';
 import { formatDuration, formatHours, formatWeight } from '@/lib/format';
-import type { SetLog } from '@/lib/types';
+import { DISCIPLINE_LABELS, LOCATION_LABELS, type SetLog } from '@/lib/types';
 
 function minutesBetween(a: string, b: string): number {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000);
@@ -53,6 +53,8 @@ export default function SessionDetailScreen() {
 
   const describe = (s: SetLog) =>
     [
+      s.location ? LOCATION_LABELS[s.location] : null,
+      s.discipline ? DISCIPLINE_LABELS[s.discipline] : null,
       s.weightKg != null ? formatWeight(s.weightKg, unit, true) : null,
       s.reps != null ? `${s.reps} reps` : null,
       s.durationSec != null ? formatDuration(s.durationSec) : null,
@@ -79,7 +81,8 @@ export default function SessionDetailScreen() {
               <Row key={s.id} style={{ opacity: s.completed ? 1 : 0.5 }}>
                 <Icon name={s.completed ? 'check-circle' : 'circle-outline'} size={18} color={s.completed ? c.success : c.textSecondary} />
                 <T style={{ fontVariant: ['tabular-nums'] }}>
-                  Set {s.setIndex + 1}: {s.completed ? describe(s) : s.weightKg != null ? `${describe(s)} · not completed` : 'skipped'}
+                  Set {s.setIndex + 1}
+                  {s.notes ? ` · ${s.notes}` : ''}: {s.completed ? describe(s) : s.weightKg != null ? `${describe(s)} · not completed` : 'skipped'}
                 </T>
               </Row>
             ))}

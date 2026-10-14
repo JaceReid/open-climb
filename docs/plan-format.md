@@ -12,6 +12,7 @@ The source of truth is [src/lib/import/schema.ts](../src/lib/import/schema.ts). 
 {
   "format": "open-climb-plan",   // optional
   "version": 1,                  // optional
+  "planId": "pl-…",              // optional: update this existing plan in place (from "Adjust with Claude")
   "plan": {                      // required when "blocks" is present
     "name": "Autumn Finger Strength",
     "description": "…",          // optional
@@ -26,6 +27,14 @@ The source of truth is [src/lib/import/schema.ts](../src/lib/import/schema.ts). 
 
 A file with only `workouts` and/or `exercises` imports them into the library without creating a plan.
 
+### Updating an existing plan
+
+**Adjust with Claude** (on a plan's page, or Settings) gives Claude the plan in this format with its `planId`, plus
+the training log. When the reply keeps that `planId`, importing it offers **Update plan**. This replaces the plan's
+blocks and schedule but keeps its id, start date and active state, and sessions already logged stay ticked off when the
+new schedule has the same workout on that date. Workouts in the file whose `id` already exists (the plan's own
+workouts are exported with their ids) are updated in place instead of duplicated.
+
 ### Exercise
 
 | Field | Type | Notes |
@@ -34,7 +43,7 @@ A file with only `workouts` and/or `exercises` imports them into the library wit
 | `name` | string | If an exercise with the same name already exists, that one is reused. |
 | `category` | `fingerboard` · `bouldering` · `routes` · `campus` · `strength` · `antagonist` · `core` · `mobility` · `other` | Unknown values become `other`. |
 | `type` | `finger-strength` · `strength` · `power` · `power-endurance` · `endurance` · `technique` · `prehab` · `mobility` · `other` | Optional. What the exercise trains; drives the Progress tab's training-mix chart. If omitted, it's guessed from `category`. |
-| `tracks` | array of `weight` · `reps` · `duration` · `grade` | What the log asks for per set. |
+| `tracks` | array of `weight` · `reps` · `duration` · `grade` · `location` · `discipline` | What the log asks for per set. `location` is indoor/outdoor and `discipline` is boulder/route (as on Open Climbing). |
 | `bodyweight` | boolean | `true` if `weightKg` is added to bodyweight (hangs, pull-ups). Enables the % bodyweight chart. |
 | `description`, `instructions`, `equipment` | string | Optional. |
 
@@ -61,6 +70,7 @@ A file with only `workouts` and/or `exercises` imports them into the library wit
 | `pctOfMax` | number | Working weight as a % of the latest tested max, e.g. `80`. For bodyweight exercises it's % of total load (bodyweight + added). Replaces `weightKg` once a max has been tested; until then `weightKg` is used. |
 | `intensity`, `grip`, `notes` | string | e.g. `"RPE 8"`, `"half crimp"`, `"add 2 kg/week if clean"`. |
 | `edgeMm` | number | Edge depth. |
+| `setLabels` | string[] | Per-set labels, e.g. grips: `["half crimp", "front three", "open hand"]`. Cycled if there are more sets than labels; shown in the timer and recorded with each set. |
 
 ### Block
 

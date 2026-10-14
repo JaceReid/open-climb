@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { ExercisePicker } from '@/components/pickers';
-import { Button, Card, Field, IconButton, Loading, NumberField, Row, Screen, Section, T } from '@/components/ui';
+import { Button, Card, Field, IconButton, ListField, Loading, NumberField, Row, Screen, Section, T } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { libraryWorkout } from '@/data/library';
 import { getWorkout, saveWorkout } from '@/db/repo';
@@ -152,6 +152,13 @@ export default function WorkoutEditScreen() {
                   <Field label="Grip" value={item.grip ?? ''} onChangeText={(t) => setItem(i, { grip: t || undefined })} placeholder="half crimp" />
                 </View>
               </Row>
+              <ListField
+                label="Set labels"
+                value={item.setLabels}
+                onChange={(setLabels) => setItem(i, { setLabels })}
+                placeholder="e.g. half crimp, front three, open hand"
+                hint="One per set, shown in the timer and log; repeats if there are more sets than labels."
+              />
               <Field label="Notes" value={item.notes ?? ''} onChangeText={(t) => setItem(i, { notes: t || undefined })} />
             </Card>
           );

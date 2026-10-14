@@ -2,9 +2,11 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Share, Switch } from 'react-native';
+import { Alert, Share, Switch } from 'react-native';
 
+import { ClaudeReviewCard } from '@/components/claude-review';
 import { Button, Card, NumberField, Row, Screen, Section, Segmented, T } from '@/components/ui';
+import { loadDemoData } from '@/db/demo';
 import { setSetting } from '@/db/repo';
 import { useExercises, useSettings, useWorkouts } from '@/hooks/data';
 import { useTheme } from '@/hooks/use-theme';
@@ -68,6 +70,7 @@ export default function SettingsScreen() {
           </Row>
           <Button title="Import a plan" icon="import" variant="ghost" small onPress={() => router.push('/import')} />
         </Card>
+        <ClaudeReviewCard title="Review my training" />
       </Section>
 
       <Section title="Units">
@@ -127,6 +130,22 @@ export default function SettingsScreen() {
         {toggle('voice', 'Voice', 'Speaks the next exercise and rest periods.')}
         {toggle('vibrate', 'Vibration', 'Buzz when a hang or rest starts.')}
       </Section>
+
+      {__DEV__ ? (
+        <Section title="Developer">
+          <Button
+            title="Load demo data"
+            icon="database-plus-outline"
+            variant="secondary"
+            onPress={() =>
+              Alert.alert('Load demo data?', 'Adds the example plan, ~8 weeks of sessions and max tests. Only for development.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Load', onPress: () => loadDemoData(db).catch((e) => Alert.alert('Failed', String(e))) },
+              ])
+            }
+          />
+        </Section>
+      ) : null}
 
       <T variant="caption" tone="secondary" style={{ textAlign: 'center' }}>
         open-climb · free software (GPL-3.0) · all data stays on this device

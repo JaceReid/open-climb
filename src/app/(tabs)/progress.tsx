@@ -28,7 +28,7 @@ import {
   type Period,
 } from '@/lib/analytics';
 import { formatDay, formatShort, parseDate, today } from '@/lib/dates';
-import { displayWeight, formatHours, formatWeight, plural } from '@/lib/format';
+import { displayWeight, formatHours, formatHoursShort, formatWeight, plural } from '@/lib/format';
 import { sessionSeries, weightTrend, type LoggedSet } from '@/lib/metrics';
 import { TRAINING_TYPE_LABELS, type TrainingType } from '@/lib/types';
 
@@ -121,6 +121,8 @@ function Overview({ sessions, sets, period }: { sessions: Sessions; sets: Sets; 
 
   const unit = bucketUnit(period);
   const buckets = activityBuckets(sessions, period, today(), metric);
+  // Time axis in minutes, or whole hours once the busiest bar passes 2 h, so ticks stay round.
+  const secPerUnit = metric === 'time' && Math.max(0, ...buckets.map((b) => b.value)) >= 7200 ? 3600 : 60;
   const bars: BarDatum[] = buckets.map((b) => {
     const d = parseDate(b.start);
     return {
@@ -128,7 +130,7 @@ function Overview({ sessions, sets, period }: { sessions: Sessions; sets: Sets; 
       label: b.label,
       tooltip:
         unit === 'day' ? formatDay(b.start) : unit === 'week' ? `Week of ${formatShort(b.start)}` : `${MONTHS[d.getMonth()]} ${d.getFullYear()}`,
-      value: metric === 'time' ? b.value / 60 : b.value,
+      value: metric === 'time' ? b.value / secPerUnit : b.value,
     };
   });
   const per = unit === 'day' ? 'day' : unit;
@@ -141,7 +143,7 @@ function Overview({ sessions, sets, period }: { sessions: Sessions; sets: Sets; 
     <>
       <Row>
         <Stat label="Sessions" value={String(sessions.length)} />
-        <Stat label="Training time" value={formatHours(totalSec)} />
+        <Stat label="Training time" value={formatHoursShort(totalSec)} />
         <Stat label="Active days" value={String(activeDays)} />
       </Row>
 
@@ -167,7 +169,7 @@ function Overview({ sessions, sets, period }: { sessions: Sessions; sets: Sets; 
                   </>
                 ) : (
                   <>
-                    <T variant="title">{formatHours(totalSec)}</T>
+                    <T variant="title">{formatHoursShort(totalSec)}</T>
                     <T variant="caption" tone="secondary">
                       total
                     </T>
@@ -208,10 +210,10 @@ function Overview({ sessions, sets, period }: { sessions: Sessions; sets: Sets; 
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
-          <T variant="label" tone="secondary">
-            {metric === 'time' ? `TRAINING TIME PER ${per.toUpperCase()}` : `SESSIONS PER ${per.toUpperCase()}`}
+          <T variant="label" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+            {metric === 'time' ? `TIME PER ${per.toUpperCase()}` : `SESSIONS PER ${per.toUpperCase()}`}
           </T>
-          <T variant="heading">{metric === 'time' ? formatHours(totalSec) : plural(sessions.length, 'session')}</T>
+          <T variant="heading">{metric === 'time' ? formatHoursShort(totalSec) : plural(sessions.length, 'session')}</T>
         </Row>
         <Segmented<Metric>
           options={[
@@ -223,8 +225,8 @@ function Overview({ sessions, sets, period }: { sessions: Sessions; sets: Sets; 
         />
         <BarChart
           data={bars}
-          formatAxis={(v) => (metric === 'time' ? (v >= 60 ? `${Math.round((v / 60) * 10) / 10}h` : `${Math.round(v)}m`) : String(v))}
-          formatValue={(v) => (metric === 'time' ? formatHours(v * 60) : plural(v, 'session'))}
+          formatAxis={(v) => (metric === 'time' ? `${v}${secPerUnit === 3600 ? 'h' : 'm'}` : String(v))}
+          formatValue={(v) => (metric === 'time' ? formatHours(v * secPerUnit) : plural(v, 'session'))}
         />
       </Card>
     </>
@@ -312,7 +314,9 @@ function Performance({ period }: { period: Period }) {
     const exercise = exercises.get(id);
     if (!exercise || !exercise.tracks.includes('weight')) return [];
     const trend = weightTrend(sessionSeries(list, exercise, bodyweightKg), from);
-    return trend ? [{ exercise, trend }] : [];
+    // Only ever done at bodyweight (+0): no weight progress to show.
+    if (!trend || trend.points.every((p) => p.topWeightKg === 0)) return [];
+    return [{ exercise, trend }];
   });
   rows.sort((a, b) => b.trend.latest.date.localeCompare(a.trend.latest.date));
 
@@ -379,7 +383,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       <T variant="caption" tone="secondary">
         {label}
       </T>
-      <T variant="heading" style={{ fontSize: 20, lineHeight: 26 }}>
+      <T variant="heading" style={{ fontSize: 20, lineHeight: 26 }} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </T>
     </Card>

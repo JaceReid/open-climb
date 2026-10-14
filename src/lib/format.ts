@@ -2,6 +2,12 @@ import type { Exercise, Prescription, Settings } from './types';
 
 type Unit = Settings['unit'];
 
+/** Label of a set from a prescription's setLabels, cycling through them. */
+export function setLabel(p: Pick<Prescription, 'setLabels'>, setIndex: number): string | null {
+  const labels = p.setLabels?.filter((l) => l.trim()) ?? [];
+  return labels.length ? labels[setIndex % labels.length] : null;
+}
+
 /** "1 set", "3 sets" */
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -59,6 +65,15 @@ export function formatHours(sec: number): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
+/** Compact totals for tight spaces: "45m", "6h", "11h 52m". */
+export function formatHoursShort(sec: number): string {
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 /** "≈ 45 min" */
 export function formatEstimate(sec: number): string {
   if (sec <= 0) return '';
@@ -101,6 +116,7 @@ export function formatDetails(
   }
   if (p.edgeMm) parts.push(`${p.edgeMm}mm`);
   if (p.grip) parts.push(p.grip);
+  if (p.setLabels?.length) parts.push(p.setLabels.join(' → '));
   if (p.intensity) parts.push(p.intensity);
   if (p.setRestSec && p.sets > 1) parts.push(`rest ${formatDuration(p.setRestSec)}`);
   return parts.join(' · ');

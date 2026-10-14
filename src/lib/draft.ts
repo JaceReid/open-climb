@@ -1,7 +1,8 @@
 // The editable log of a session before it is saved: one row per prescribed set,
 // prefilled from the workout so logging is mostly ticking boxes.
+import { setLabel } from './format';
 import { estimateSetSec } from './timer';
-import type { Exercise, SetLog, TrackField, Workout, WorkoutItem } from './types';
+import type { Discipline, Exercise, Location, SetLog, TrackField, Workout, WorkoutItem } from './types';
 
 export interface DraftSet {
   weightKg: number | null;
@@ -9,6 +10,10 @@ export interface DraftSet {
   durationSec: number | null;
   grade: string | null;
   completed: boolean;
+  /** Per-set label from the prescription (e.g. a grip). */
+  label: string | null;
+  location: Location | null;
+  discipline: Discipline | null;
 }
 
 export interface DraftItem {
@@ -19,6 +24,8 @@ export interface DraftItem {
   bodyweight: boolean;
   /** Estimated seconds per set (rests included), from the prescription. */
   estSetSec: number;
+  /** Long efforts (climbing sessions, ARC) are entered in minutes. */
+  durationUnit: 'sec' | 'min';
   sets: DraftSet[];
 }
 
@@ -37,6 +44,9 @@ export function draftItem(
     durationSec: tracks.includes('duration') ? (item.workSec ?? null) : null,
     grade: null,
     completed: isCompleted(setIndex),
+    label: setLabel(item, setIndex),
+    location: tracks.includes('location') ? 'indoor' : null,
+    discipline: tracks.includes('discipline') ? 'boulder' : null,
   });
   return {
     itemIndex,
@@ -45,6 +55,7 @@ export function draftItem(
     tracks,
     bodyweight,
     estSetSec: estimateSetSec(item),
+    durationUnit: (item.workSec ?? 0) >= 300 ? 'min' : 'sec',
     sets: Array.from({ length: Math.max(1, item.sets) }, (_, i) => set(i)),
   };
 }
@@ -94,8 +105,10 @@ export function draftToSetLogs(draft: DraftItem[]): Omit<SetLog, 'id' | 'session
       durationSec: s.durationSec,
       grade: s.grade,
       completed: s.completed,
-      notes: '',
+      notes: s.label ?? '',
       estSec: item.estSetSec,
+      location: s.location,
+      discipline: s.discipline,
     })),
   );
 }

@@ -10,7 +10,8 @@ import { Alert, View } from 'react-native';
 
 import { Badge, Button, Card, Field, Icon, Row, Screen, Section, T } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { applyImport } from '@/db/repo';
+import { applyImport, applyPlanUpdate, listPlans } from '@/db/repo';
+import { useQuery } from '@/db/store';
 import { useExercises, useWorkouts } from '@/hooks/data';
 import { useTheme } from '@/hooks/use-theme';
 import { EXAMPLE_PLAN } from '@/lib/import/example';
@@ -26,10 +27,11 @@ export default function ImportScreen() {
   const [text, setText] = useState('');
   const [result, setResult] = useState<ImportResult | null>(null);
   const [importing, setImporting] = useState(false);
+  const { data: plans } = useQuery(listPlans);
 
   const check = (t: string) => {
     setText(t);
-    setResult(t.trim() ? parseImport(t, { exercises, workouts }) : null);
+    setResult(t.trim() ? parseImport(t, { exercises, workouts, plans: plans ?? [] }) : null);
   };
 
   const paste = async () => {
@@ -48,10 +50,16 @@ export default function ImportScreen() {
     }
   };
 
-  const doImport = async () => {
+  const doImport = async (asNewPlan = false) => {
     if (!result?.ok) return;
     setImporting(true);
     try {
+      const target = result.preview.updatePlan;
+      if (target && !asNewPlan) {
+        await applyPlanUpdate(db, target.id, result.preview);
+        router.replace(`/plan/${target.id}`);
+        return;
+      }
       const planId = await applyImport(db, result.preview);
       if (planId) {
         router.replace(`/plan/${planId}`);
@@ -68,7 +76,9 @@ export default function ImportScreen() {
 
   const preview = result?.ok ? result.preview : null;
   const nameOfWorkout = (id: string) =>
-    preview?.newWorkouts.find((w) => w.id === id)?.name ?? workoutsById.get(id)?.name ?? id;
+    [...(preview?.newWorkouts ?? []), ...(preview?.updatedWorkouts ?? [])].find((w) => w.id === id)?.name ??
+    workoutsById.get(id)?.name ??
+    id;
 
   return (
     <Screen>
@@ -131,6 +141,7 @@ export default function ImportScreen() {
                 <Badge label={`${preview.blocks.reduce((n, b) => n + b.weeks, 0)} weeks`} tone="accent" />
               ) : null}
               <Badge label={plural(preview.newWorkouts.length, 'new workout')} />
+              {preview.updatedWorkouts.length ? <Badge label={plural(preview.updatedWorkouts.length, 'updated workout')} tone="accent2" /> : null}
               <Badge label={plural(preview.newExercises.length, 'new exercise')} />
             </Row>
           </Card>
@@ -176,17 +187,33 @@ export default function ImportScreen() {
             </Card>
           ) : null}
 
-          <Button
-            title={preview.plan ? 'Import plan' : 'Import to library'}
-            icon="import"
-            onPress={doImport}
-            disabled={importing}
-          />
-          {preview.plan ? (
-            <T variant="caption" tone="secondary">
-              You’ll choose the start week after importing.
-            </T>
-          ) : null}
+          {preview.updatePlan ? (
+            <>
+              <Card accent>
+                <T variant="heading">Updates “{preview.updatePlan.name}”</T>
+                <T tone="secondary">
+                  Replaces its blocks and schedule with this version. The start date stays the same, and sessions you’ve
+                  already logged stay ticked off where the new schedule has the same workout that day.
+                </T>
+              </Card>
+              <Button title="Update plan" icon="update" onPress={() => doImport()} disabled={importing} />
+              <Button title="Import as a new plan instead" variant="ghost" small onPress={() => doImport(true)} disabled={importing} />
+            </>
+          ) : (
+            <>
+              <Button
+                title={preview.plan ? 'Import plan' : 'Import to library'}
+                icon="import"
+                onPress={() => doImport()}
+                disabled={importing}
+              />
+              {preview.plan ? (
+                <T variant="caption" tone="secondary">
+                  You’ll choose the start week after importing.
+                </T>
+              ) : null}
+            </>
+          )}
         </Section>
       ) : null}
     </Screen>

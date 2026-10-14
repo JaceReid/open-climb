@@ -44,6 +44,7 @@ export const prescriptionShape = {
   edgeMm: z.number().positive().max(200).optional(),
   grip: z.string().optional(),
   notes: z.string().optional(),
+  setLabels: z.array(z.string()).optional(),
 };
 
 export const importExerciseSchema = z.object({
@@ -118,6 +119,8 @@ export const importFileSchema = z
   .object({
     format: z.literal('open-climb-plan').optional(),
     version: z.number().optional(),
+    // Set when Claude returns an updated version of an existing plan.
+    planId: z.string().optional(),
     plan: z
       .object({
         name: z.string().min(1),

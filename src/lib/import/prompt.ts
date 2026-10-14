@@ -6,6 +6,7 @@ import { EXAMPLE_PLAN } from './example';
 export const FORMAT_SPEC = `type PlanFile = {
   format: "open-climb-plan";
   version: 1;
+  planId?: string;         // ONLY when updating my existing plan: copy it from the plan JSON I gave you
   plan?: {                 // required when "blocks" is present
     name: string;
     description?: string;
@@ -13,7 +14,7 @@ export const FORMAT_SPEC = `type PlanFile = {
     startDate?: string;    // "YYYY-MM-DD", snapped to that week's Monday. Usually omit; I'll pick it in the app.
   };
   exercises?: Exercise[];  // ONLY exercises missing from my library
-  workouts?: Workout[];    // workouts used by this plan (library workouts can be referenced by id instead)
+  workouts?: Workout[];    // workouts used by this plan (library workouts can be referenced by id instead). Reusing an existing workout id updates that workout
   blocks?: Block[];        // training phases in order, e.g. base -> strength -> power -> deload
 };
 
@@ -51,6 +52,7 @@ type Item = {
   edgeMm?: number;
   grip?: string;           // e.g. "half crimp", "open hand"
   notes?: string;          // progression rules, cues
+  setLabels?: string[];    // per-set labels such as grips, cycled across sets, e.g. ["half crimp", "front three"]
 };
 
 type Block = {
@@ -68,7 +70,7 @@ type Day = {
   notes?: string;
 };`;
 
-function libraryList(exercises: Exercise[], workouts: Workout[]): string {
+export function libraryList(exercises: Exercise[], workouts: Workout[]): string {
   const ex = exercises
     .slice()
     .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))

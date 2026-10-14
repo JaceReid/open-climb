@@ -132,6 +132,11 @@ export const MIGRATIONS: Migration[] = [
   );
   CREATE INDEX max_tests_exercise ON max_tests(exercise_id, tested_at);
   `,
+  // v4: where and what was climbed (open climbing).
+  `
+  ALTER TABLE set_logs ADD COLUMN location TEXT;
+  ALTER TABLE set_logs ADD COLUMN discipline TEXT;
+  `,
 ];
 
 /**

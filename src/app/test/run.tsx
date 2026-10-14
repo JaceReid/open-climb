@@ -232,6 +232,8 @@ function TestFlow({
           completed: a.success,
           notes: '',
           estSec: (t.kind === 'hold' ? s.holdSec : 30) + TEST_REST_SEC,
+          location: null,
+          discipline: null,
         }));
       });
       const results = tests.flatMap((t) => {

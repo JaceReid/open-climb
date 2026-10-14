@@ -61,7 +61,9 @@ export function LogForm({
           <Row gap={Spacing.xs} style={{ paddingLeft: 40 }}>
             {item.tracks.includes('weight') ? <ColHeader label={item.bodyweight ? `+${unit}` : unit} /> : null}
             {item.tracks.includes('reps') ? <ColHeader label="reps" /> : null}
-            {item.tracks.includes('duration') ? <ColHeader label="sec" /> : null}
+            {item.tracks.includes('location') ? <ColHeader label="where" /> : null}
+            {item.tracks.includes('discipline') ? <ColHeader label="type" /> : null}
+            {item.tracks.includes('duration') ? <ColHeader label={item.durationUnit} /> : null}
             {item.tracks.includes('grade') ? <ColHeader label="grade" /> : null}
           </Row>
           {item.sets.map((set, s) => (
@@ -70,6 +72,7 @@ export function LogForm({
               index={s}
               set={set}
               tracks={item.tracks}
+              durationUnit={item.durationUnit}
               unit={unit}
               onChange={(patch) => updateSet(i, s, patch)}
               onRemove={item.sets.length > 1 ? () => removeSet(i, s) : undefined}
@@ -103,6 +106,7 @@ function SetRow({
   index,
   set,
   tracks,
+  durationUnit,
   unit,
   onChange,
   onRemove,
@@ -111,6 +115,7 @@ function SetRow({
   index: number;
   set: DraftSet;
   tracks: DraftItem['tracks'];
+  durationUnit: DraftItem['durationUnit'];
   unit: Settings['unit'];
   onChange: (patch: Partial<DraftSet>) => void;
   onRemove?: () => void;
@@ -118,43 +123,74 @@ function SetRow({
 }) {
   const c = useTheme();
   const inputStyle = [styles.cell, { color: c.text, backgroundColor: c.surfaceAlt }];
+  const perUnit = durationUnit === 'min' ? 60 : 1;
+  // Tap-to-switch cell for two-option fields (indoor/outdoor, boulder/route).
+  const toggle = (label: string, onPress: () => void) => (
+    <Pressable onPress={onPress} style={[styles.cell, styles.gradeCell, { backgroundColor: c.surfaceAlt }]} accessibilityRole="button">
+      <T variant="label" numberOfLines={1}>
+        {label}
+      </T>
+    </Pressable>
+  );
   return (
-    <Row gap={Spacing.xs} style={{ opacity: set.completed ? 1 : 0.55 }}>
-      <Pressable
-        onPress={() => onChange({ completed: !set.completed })}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: set.completed }}
-        accessibilityLabel={`Set ${index + 1} done`}
-        style={[styles.check, { borderColor: set.completed ? c.success : c.border, backgroundColor: set.completed ? c.success : 'transparent' }]}>
-        {set.completed ? <Icon name="check" size={18} color={c.surface} /> : <T variant="label">{index + 1}</T>}
-      </Pressable>
-      {tracks.includes('weight') ? (
-        <NumberInput
-          allowNegative
-          value={set.weightKg == null ? undefined : displayWeight(set.weightKg, unit)}
-          onChange={(v) => onChange({ weightKg: v == null ? null : unitToKg(v, unit) })}
-          placeholder="–"
-          style={inputStyle}
-        />
-      ) : null}
-      {tracks.includes('reps') ? (
-        <NumberInput integer value={set.reps} onChange={(v) => onChange({ reps: v ?? null })} placeholder="–" style={inputStyle} />
-      ) : null}
-      {tracks.includes('duration') ? (
-        <NumberInput value={set.durationSec} onChange={(v) => onChange({ durationSec: v ?? null })} placeholder="–" style={inputStyle} />
-      ) : null}
-      {tracks.includes('grade') ? (
-        <Pressable onPress={onPickGrade} style={[styles.cell, styles.gradeCell, { backgroundColor: c.surfaceAlt }]}>
-          <T variant="heading">{set.grade ?? '–'}</T>
-        </Pressable>
-      ) : null}
-      {tracks.length === 0 ? (
-        <T tone="secondary" style={{ flex: 1 }}>
-          Set {index + 1}
+    <View style={{ gap: 2 }}>
+      {set.label ? (
+        <T variant="caption" tone="secondary" style={{ paddingLeft: 40 }}>
+          Set {index + 1} · {set.label}
         </T>
       ) : null}
-      {onRemove ? <IconButton name="close" label="Remove set" size={18} color={c.textSecondary} onPress={onRemove} /> : <View style={{ width: 26 }} />}
-    </Row>
+      <Row gap={Spacing.xs} style={{ opacity: set.completed ? 1 : 0.55 }}>
+        <Pressable
+          onPress={() => onChange({ completed: !set.completed })}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: set.completed }}
+          accessibilityLabel={`Set ${index + 1} done`}
+          style={[styles.check, { borderColor: set.completed ? c.success : c.border, backgroundColor: set.completed ? c.success : 'transparent' }]}>
+          {set.completed ? <Icon name="check" size={18} color={c.surface} /> : <T variant="label">{index + 1}</T>}
+        </Pressable>
+        {tracks.includes('weight') ? (
+          <NumberInput
+            allowNegative
+            value={set.weightKg == null ? undefined : displayWeight(set.weightKg, unit)}
+            onChange={(v) => onChange({ weightKg: v == null ? null : unitToKg(v, unit) })}
+            placeholder="–"
+            style={inputStyle}
+          />
+        ) : null}
+        {tracks.includes('reps') ? (
+          <NumberInput integer value={set.reps} onChange={(v) => onChange({ reps: v ?? null })} placeholder="–" style={inputStyle} />
+        ) : null}
+        {tracks.includes('location')
+          ? toggle(set.location === 'outdoor' ? 'Outdoor' : 'Indoor', () =>
+              onChange({ location: set.location === 'outdoor' ? 'indoor' : 'outdoor' }),
+            )
+          : null}
+        {tracks.includes('discipline')
+          ? toggle(set.discipline === 'route' ? 'Route' : 'Boulder', () =>
+              onChange({ discipline: set.discipline === 'route' ? 'boulder' : 'route' }),
+            )
+          : null}
+        {tracks.includes('duration') ? (
+          <NumberInput
+            value={set.durationSec == null ? undefined : Math.round((set.durationSec / perUnit) * 10) / 10}
+            onChange={(v) => onChange({ durationSec: v == null ? null : v * perUnit })}
+            placeholder="–"
+            style={inputStyle}
+          />
+        ) : null}
+        {tracks.includes('grade') ? (
+          <Pressable onPress={onPickGrade} style={[styles.cell, styles.gradeCell, { backgroundColor: c.surfaceAlt }]}>
+            <T variant="heading">{set.grade ?? '–'}</T>
+          </Pressable>
+        ) : null}
+        {tracks.length === 0 ? (
+          <T tone="secondary" style={{ flex: 1 }}>
+            Set {index + 1}
+          </T>
+        ) : null}
+        {onRemove ? <IconButton name="close" label="Remove set" size={18} color={c.textSecondary} onPress={onRemove} /> : <View style={{ width: 26 }} />}
+      </Row>
+    </View>
   );
 }
 

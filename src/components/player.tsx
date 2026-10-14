@@ -4,12 +4,12 @@ import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Alert, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatClock, formatDetails, formatDuration, formatSetsReps } from '@/lib/format';
+import { formatClock, formatDetails, formatDuration, formatSetsReps, setLabel } from '@/lib/format';
 import { completedSetKeys, elapsedMs, initPlayer, playerReducer, remainingMs } from '@/lib/player';
 import { buildSteps, type TimerStep } from '@/lib/timer';
 import type { Exercise, Settings, Workout } from '@/lib/types';
@@ -120,9 +120,11 @@ export function Player({
       case 'ready':
         cues.say(`${state.index === 0 ? '' : 'Next: '}${exercise?.name ?? ''}`);
         break;
-      case 'prep':
-        cues.say('Get ready');
+      case 'prep': {
+        const grip = item ? setLabel(item, step.setIndex) : null;
+        cues.say(`Get ready${grip ? `, ${grip}` : ''}`);
         break;
+      }
       case 'work':
       case 'manual':
         cues.go();
@@ -130,10 +132,12 @@ export function Player({
       case 'rest':
         cues.rest();
         break;
-      case 'setRest':
+      case 'setRest': {
         cues.rest();
-        cues.say(`Rest, ${spokenDuration(step.durationSec ?? 0)}`);
+        const grip = item ? setLabel(item, step.setIndex + 1) : null;
+        cues.say(`Rest, ${spokenDuration(step.durationSec ?? 0)}${grip ? `. Next: ${grip}` : ''}`);
         break;
+      }
     }
     // Cues are fire-and-forget; only the step change matters here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,6 +190,10 @@ export function Player({
   const details = formatDetails(item, exercise, settings.unit);
   const timedItem = (item.workSec ?? 0) > 0;
   const setLine = `Set ${step.setIndex + 1} of ${item.sets}${timedItem && item.reps > 1 ? ` · Rep ${step.repIndex + 1} of ${item.reps}` : ''}`;
+  const grip = setLabel(item, step.setIndex);
+  const nextGrip = setLabel(item, step.setIndex + 1);
+  // What to do: the exercise's how-to, else its description (custom exercises often only have one).
+  const howTo = [exercise?.description, exercise?.instructions].filter(Boolean).join('\n\n');
   const progress = state.index / steps.length;
 
   const clock =
@@ -218,9 +226,17 @@ export function Player({
             <Text style={styles.sub}>{formatSetsReps(item)}</Text>
             {details ? <Text style={styles.sub}>{details}</Text> : null}
             {item.notes ? <Text style={styles.note}>{item.notes}</Text> : null}
+            {howTo ? (
+              <ScrollView style={styles.howTo} contentContainerStyle={{ padding: Spacing.md }}>
+                <Text style={styles.howToText}>{howTo}</Text>
+              </ScrollView>
+            ) : null}
           </>
         ) : (
-          <Text style={styles.sub}>{setLine}</Text>
+          <>
+            <Text style={styles.sub}>{setLine}</Text>
+            {grip && step.kind !== 'setRest' ? <Text style={styles.grip}>{grip}</Text> : null}
+          </>
         )}
 
         {clock != null ? (
@@ -237,8 +253,16 @@ export function Player({
         ) : null}
         {step.kind === 'setRest' || step.kind === 'rest' || step.kind === 'prep' ? (
           <Text style={styles.next}>
-            Next: {step.kind === 'setRest' ? `set ${step.setIndex + 2} of ${item.sets}` : `${workLabel(exercise).toLowerCase()} ${formatDuration(item.workSec ?? 0)}`}
+            Next:{' '}
+            {step.kind === 'setRest'
+              ? `set ${step.setIndex + 2} of ${item.sets}${nextGrip ? ` · ${nextGrip}` : ''}`
+              : `${workLabel(exercise).toLowerCase()} ${formatDuration(item.workSec ?? 0)}`}
             {step.kind !== 'setRest' && details ? ` · ${details}` : ''}
+          </Text>
+        ) : null}
+        {step.kind === 'setRest' && howTo ? (
+          <Text style={[styles.howToText, { marginTop: Spacing.md, textAlign: 'center' }]} numberOfLines={4}>
+            {howTo}
           </Text>
         ) : null}
       </View>
@@ -298,6 +322,19 @@ const styles = StyleSheet.create({
   exercise: { color: WHITE, fontSize: 30, fontWeight: '800', textAlign: 'center' },
   sub: { color: WHITE_DIM, fontSize: 17, fontWeight: '600', textAlign: 'center' },
   note: { color: WHITE, fontSize: 15, fontStyle: 'italic', textAlign: 'center', marginTop: Spacing.sm },
+  grip: {
+    color: WHITE,
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
+  },
+  howTo: { maxHeight: 200, alignSelf: 'stretch', marginTop: Spacing.md, borderRadius: Radius.md, backgroundColor: 'rgba(255,255,255,0.12)' },
+  howToText: { color: WHITE_DIM, fontSize: 15, lineHeight: 21 },
   clock: {
     color: WHITE,
     fontSize: 112,

@@ -25,6 +25,7 @@ Format:
 type PlanFile = {
   format: "open-climb-plan";
   version: 1;
+  planId?: string;         // ONLY when updating my existing plan: copy it from the plan JSON I gave you
   plan?: {                 // required when "blocks" is present
     name: string;
     description?: string;
@@ -32,7 +33,7 @@ type PlanFile = {
     startDate?: string;    // "YYYY-MM-DD", snapped to that week's Monday. Usually omit; I'll pick it in the app.
   };
   exercises?: Exercise[];  // ONLY exercises missing from my library
-  workouts?: Workout[];    // workouts used by this plan (library workouts can be referenced by id instead)
+  workouts?: Workout[];    // workouts used by this plan (library workouts can be referenced by id instead). Reusing an existing workout id updates that workout
   blocks?: Block[];        // training phases in order, e.g. base -> strength -> power -> deload
 };
 
@@ -44,7 +45,7 @@ type Exercise = {
   description?: string;
   instructions?: string;
   equipment?: string;
-  tracks?: ("weight" | "reps" | "duration" | "grade")[];  // what to log per set
+  tracks?: ("weight" | "reps" | "duration" | "grade" | "location" | "discipline")[];  // what to log per set
   bodyweight?: boolean;    // true if weightKg is added to bodyweight (hangs, pull-ups)
 };
 
@@ -70,6 +71,7 @@ type Item = {
   edgeMm?: number;
   grip?: string;           // e.g. "half crimp", "open hand"
   notes?: string;          // progression rules, cues
+  setLabels?: string[];    // per-set labels such as grips, cycled across sets, e.g. ["half crimp", "front three"]
 };
 
 type Block = {
@@ -118,6 +120,7 @@ Exercises already in my library (reference by id):
 - forearm-stretch: Forearm Stretch (mobility, mobility; logs duration)
 - general-warmup: General Warm-up (mobility, mobility)
 - hip-mobility: Hip Mobility (mobility, mobility; logs duration)
+- open-climbing: Open Climbing (other, technique; logs location, discipline, duration)
 - arc: ARC (Continuous Climbing) (routes, endurance; logs duration)
 - on-off-intervals: On/Off Intervals (routes, endurance; logs duration)
 - route-laps: Route Laps (routes, endurance; logs grade)
@@ -144,6 +147,7 @@ Workouts already in my library (can be scheduled by id):
 - wo-full-body: Full-Body Strength (Strength)
 - wo-antagonist: Antagonist & Prehab (Injury prevention)
 - wo-core: Core Circuit (Core)
+- wo-open-climbing: Climbing Session (Climbing)
 - wo-test-max-hang: Max Hang Test (Testing)
 - wo-test-edge-lift: Edge Lift Test (Testing)
 - wo-test-pullup: Pull-up Max Test (Testing)

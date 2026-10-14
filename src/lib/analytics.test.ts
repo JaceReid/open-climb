@@ -10,7 +10,7 @@ import {
   type SessionPoint,
   type TypedSet,
 } from './analytics';
-import { formatHours } from './format';
+import { formatHours, formatHoursShort } from './format';
 
 const today = '2026-10-14'; // Wednesday
 
@@ -97,6 +97,8 @@ describe('formatHours', () => {
     expect(formatHours(45 * 60)).toBe('45 min');
     expect(formatHours(6 * 3600)).toBe('6 h');
     expect(formatHours(6 * 3600 + 20 * 60)).toBe('6 h 20 min');
+    expect(formatHoursShort(45 * 60)).toBe('45m');
+    expect(formatHoursShort(11 * 3600 + 52 * 60)).toBe('11h 52m');
   });
 });
 

@@ -5,6 +5,7 @@ import { libraryExercise, libraryWorkout, matchesLibraryExercise, matchesLibrary
 import type { SessionPoint, TypedSet } from '@/lib/analytics';
 import { newId } from '@/lib/id';
 import type { ImportPreview } from '@/lib/import/resolve';
+import { sessionsInRange } from '@/lib/schedule';
 import type { LoggedSet } from '@/lib/metrics';
 import {
   DEFAULT_SETTINGS,
@@ -191,6 +192,8 @@ interface SetLogRow {
   completed: number;
   notes: string;
   est_sec: number | null;
+  location: SetLog['location'];
+  discipline: SetLog['discipline'];
 }
 
 const toSetLog = (r: SetLogRow): SetLog => ({
@@ -207,6 +210,8 @@ const toSetLog = (r: SetLogRow): SetLog => ({
   completed: !!r.completed,
   notes: r.notes,
   estSec: r.est_sec,
+  location: r.location,
+  discipline: r.discipline,
 });
 
 // --- Exercises ---------------------------------------------------------------
@@ -492,34 +497,89 @@ export async function copyWeekToAll(db: SQLiteDatabase, blockId: string, week: n
 // --- Import ------------------------------------------------------------------
 
 /** Writes a resolved import. Returns the new plan id, if the file had a plan. */
+/** Insert a preview's blocks and sessions into a plan. Returns what was stored. */
+async function insertBlocks(
+  db: SQLiteDatabase,
+  planId: string,
+  previewBlocks: ImportPreview['blocks'],
+): Promise<{ blocks: PlanBlock[]; sessions: PlanSession[] }> {
+  const blocks: PlanBlock[] = [];
+  const sessions: PlanSession[] = [];
+  for (let i = 0; i < previewBlocks.length; i++) {
+    const b = previewBlocks[i];
+    const block: PlanBlock = { id: newId('bl-'), planId, position: i, name: b.name, focus: b.focus, notes: b.notes, weeks: b.weeks };
+    await db.runAsync(
+      'INSERT INTO plan_blocks (id, plan_id, position, name, focus, notes, weeks) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [block.id, planId, i, b.name, b.focus, b.notes, b.weeks],
+    );
+    blocks.push(block);
+    for (const s of b.sessions) {
+      const session: PlanSession = { id: newId('ps-'), blockId: block.id, ...s };
+      await db.runAsync(
+        'INSERT INTO plan_sessions (id, block_id, week, day, position, workout_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [session.id, block.id, s.week, s.day, s.position, s.workoutId, s.notes],
+      );
+      sessions.push(session);
+    }
+  }
+  return { blocks, sessions };
+}
+
+/** Writes a resolved import as a new plan. Returns the new plan id, if the file had a plan. */
 export async function applyImport(db: SQLiteDatabase, preview: ImportPreview): Promise<string | null> {
   let planId: string | null = null;
   await db.withTransactionAsync(async () => {
     for (const e of preview.newExercises) await upsertExercise(db, e);
-    for (const w of preview.newWorkouts) await upsertWorkout(db, w);
+    for (const w of [...preview.newWorkouts, ...preview.updatedWorkouts]) await upsertWorkout(db, w);
     if (!preview.plan) return;
     planId = newId('pl-');
     await db.runAsync(
       'INSERT INTO plans (id, name, description, goal, start_date, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       [planId, preview.plan.name, preview.plan.description, preview.plan.goal, preview.plan.startDate, nowIso()],
     );
-    for (let i = 0; i < preview.blocks.length; i++) {
-      const b = preview.blocks[i];
-      const blockId = newId('bl-');
-      await db.runAsync(
-        'INSERT INTO plan_blocks (id, plan_id, position, name, focus, notes, weeks) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [blockId, planId, i, b.name, b.focus, b.notes, b.weeks],
-      );
-      for (const s of b.sessions) {
-        await db.runAsync(
-          'INSERT INTO plan_sessions (id, block_id, week, day, position, workout_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [newId('ps-'), blockId, s.week, s.day, s.position, s.workoutId, s.notes],
-        );
-      }
-    }
+    await insertBlocks(db, planId, preview.blocks);
   });
   notifyChange();
   return planId;
+}
+
+/**
+ * Replace an existing plan's blocks with an updated version (e.g. from Claude),
+ * keeping its id, start date and active state. Sessions already logged against
+ * the plan stay ticked off when the new schedule has the same workout that day.
+ */
+export async function applyPlanUpdate(db: SQLiteDatabase, planId: string, preview: ImportPreview): Promise<void> {
+  const plan = await getPlan(db, planId);
+  if (!plan) throw new Error('Plan not found');
+  const linked = await db.getAllAsync<{ id: string; scheduled_date: string | null; workout_id: string | null }>(
+    `SELECT l.id, l.scheduled_date, l.workout_id FROM session_logs l
+     JOIN plan_sessions s ON s.id = l.plan_session_id
+     JOIN plan_blocks b ON b.id = s.block_id
+     WHERE b.plan_id = ?`,
+    [planId],
+  );
+  await db.withTransactionAsync(async () => {
+    for (const e of preview.newExercises) await upsertExercise(db, e);
+    for (const w of [...preview.newWorkouts, ...preview.updatedWorkouts]) await upsertWorkout(db, w);
+    if (preview.plan) {
+      await db.runAsync('UPDATE plans SET name = ?, description = ?, goal = ? WHERE id = ?', [
+        preview.plan.name,
+        preview.plan.description,
+        preview.plan.goal,
+        planId,
+      ]);
+    }
+    // Deleting blocks cascades to their sessions and unlinks logs (SET NULL).
+    await db.runAsync('DELETE FROM plan_blocks WHERE plan_id = ?', [planId]);
+    const { blocks, sessions } = await insertBlocks(db, planId, preview.blocks);
+    if (!plan.startDate) return;
+    const dated = sessionsInRange(plan.startDate, blocks, sessions, '0000-01-01', '9999-12-31');
+    for (const l of linked) {
+      const match = dated.find((d) => d.date === l.scheduled_date && d.session.workoutId === l.workout_id);
+      if (match) await db.runAsync('UPDATE session_logs SET plan_session_id = ? WHERE id = ?', [match.session.id, l.id]);
+    }
+  });
+  notifyChange();
 }
 
 // --- Logs --------------------------------------------------------------------
@@ -540,9 +600,9 @@ export async function saveSessionLog(
     );
     for (const s of sets) {
       await db.runAsync(
-        `INSERT INTO set_logs (id, session_id, exercise_id, exercise_name, item_index, set_index, weight_kg, reps, duration_sec, grade, completed, notes, est_sec)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [newId('set-'), id, s.exerciseId, s.exerciseName, s.itemIndex, s.setIndex, s.weightKg, s.reps, s.durationSec, s.grade, s.completed ? 1 : 0, s.notes, s.estSec],
+        `INSERT INTO set_logs (id, session_id, exercise_id, exercise_name, item_index, set_index, weight_kg, reps, duration_sec, grade, completed, notes, est_sec, location, discipline)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [newId('set-'), id, s.exerciseId, s.exerciseName, s.itemIndex, s.setIndex, s.weightKg, s.reps, s.durationSec, s.grade, s.completed ? 1 : 0, s.notes, s.estSec, s.location, s.discipline],
       );
     }
   });
@@ -581,6 +641,12 @@ export async function completedPlanSessions(db: SQLiteDatabase, from: string, to
   return new Set(rows.map((r) => `${r.plan_session_id}@${r.scheduled_date}`));
 }
 
+/**
+ * Sessions that were max tests. Their attempts (short maximal holds/singles) are
+ * kept out of working-weight trends; the max itself lives in max_tests.
+ */
+const TEST_SESSIONS = 'SELECT session_id FROM max_tests WHERE session_id IS NOT NULL';
+
 export async function loggedSetsForExercise(db: SQLiteDatabase, exerciseId: string): Promise<LoggedSet[]> {
   const rows = await db.getAllAsync<{
     session_id: string;
@@ -594,7 +660,8 @@ export async function loggedSetsForExercise(db: SQLiteDatabase, exerciseId: stri
   }>(
     `SELECT s.session_id, s.weight_kg, s.reps, s.duration_sec, s.grade, s.completed, l.completed_at, l.bodyweight_kg
      FROM set_logs s JOIN session_logs l ON l.id = s.session_id
-     WHERE s.exercise_id = ? ORDER BY l.completed_at`,
+     WHERE s.exercise_id = ? AND l.id NOT IN (${TEST_SESSIONS})
+     ORDER BY l.completed_at`,
     [exerciseId],
   );
   return rows.map((r) => ({
@@ -714,7 +781,7 @@ export async function weightedSets(db: SQLiteDatabase): Promise<(LoggedSet & { e
   }>(
     `SELECT s.exercise_id, s.session_id, s.weight_kg, s.reps, s.duration_sec, s.grade, l.completed_at, l.bodyweight_kg
      FROM set_logs s JOIN session_logs l ON l.id = s.session_id
-     WHERE s.completed = 1 AND s.weight_kg IS NOT NULL
+     WHERE s.completed = 1 AND s.weight_kg IS NOT NULL AND l.id NOT IN (${TEST_SESSIONS})
      ORDER BY l.completed_at`,
   );
   return rows.map((r) => ({
@@ -796,9 +863,9 @@ export async function saveTestSession(
     );
     for (const s of sets) {
       await db.runAsync(
-        `INSERT INTO set_logs (id, session_id, exercise_id, exercise_name, item_index, set_index, weight_kg, reps, duration_sec, grade, completed, notes, est_sec)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [newId('set-'), sessionId, s.exerciseId, s.exerciseName, s.itemIndex, s.setIndex, s.weightKg, s.reps, s.durationSec, s.grade, s.completed ? 1 : 0, s.notes, s.estSec],
+        `INSERT INTO set_logs (id, session_id, exercise_id, exercise_name, item_index, set_index, weight_kg, reps, duration_sec, grade, completed, notes, est_sec, location, discipline)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [newId('set-'), sessionId, s.exerciseId, s.exerciseName, s.itemIndex, s.setIndex, s.weightKg, s.reps, s.durationSec, s.grade, s.completed ? 1 : 0, s.notes, s.estSec, s.location, s.discipline],
       );
     }
     for (const t of tests) {
@@ -811,4 +878,17 @@ export async function saveTestSession(
   });
   notifyChange();
   return sessionId;
+}
+
+/** Sessions completed on or after `from`, with their sets (for the Claude review). */
+export async function sessionLogsWithSets(db: SQLiteDatabase, from: string): Promise<{ log: SessionLog; sets: SetLog[] }[]> {
+  const logs = await db.getAllAsync<SessionLogRow>('SELECT * FROM session_logs WHERE completed_at >= ? ORDER BY completed_at', [from]);
+  const sets = await db.getAllAsync<SetLogRow>(
+    `SELECT s.* FROM set_logs s JOIN session_logs l ON l.id = s.session_id
+     WHERE l.completed_at >= ? ORDER BY s.item_index, s.set_index`,
+    [from],
+  );
+  const bySession = new Map<string, SetLog[]>();
+  for (const r of sets) bySession.set(r.session_id, [...(bySession.get(r.session_id) ?? []), toSetLog(r)]);
+  return logs.map((r) => ({ log: toSessionLog(r), sets: bySession.get(r.id) ?? [] }));
 }

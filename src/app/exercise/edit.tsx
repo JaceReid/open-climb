@@ -3,7 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, Switch } from 'react-native';
 
-import { Button, Card, Chip, Field, Loading, NumberField, Row, Screen, Section, T } from '@/components/ui';
+import { Button, Card, Chip, Field, ListField, Loading, NumberField, Row, Screen, Section, T } from '@/components/ui';
 import { libraryExercise } from '@/data/library';
 import { getExercise, saveExercise } from '@/db/repo';
 import { useTheme } from '@/hooks/use-theme';
@@ -12,14 +12,13 @@ import {
   CATEGORIES,
   CATEGORY_LABELS,
   TRACK_FIELDS,
+  TRACK_LABELS,
   TRAINING_TYPE_LABELS,
   TRAINING_TYPES,
   defaultTrainingType,
   type Exercise,
   type Prescription,
 } from '@/lib/types';
-
-const TRACK_LABELS = { weight: 'Weight', reps: 'Reps', duration: 'Time', grade: 'Grade' } as const;
 
 const blank = (): Exercise => ({
   id: newId('ex-'),
@@ -157,6 +156,13 @@ export default function ExerciseEditScreen() {
           <NumberField label="Set rest" suffix="s" value={exercise.defaults.setRestSec} onChange={(v) => setDefaults({ setRestSec: v })} placeholder="–" />
           <NumberField label="Edge" suffix="mm" value={exercise.defaults.edgeMm} onChange={(v) => setDefaults({ edgeMm: v })} placeholder="–" />
         </Row>
+        <ListField
+          label="Set labels"
+          value={exercise.defaults.setLabels}
+          onChange={(setLabels) => setDefaults({ setLabels })}
+          placeholder="e.g. half crimp, front three, open hand"
+          hint="One per set (e.g. the grip), shown in the timer and log."
+        />
       </Section>
 
       <Button title="Save exercise" icon="content-save-outline" onPress={save} />

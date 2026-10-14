@@ -1,36 +1,12 @@
 /// <reference types="node" />
-// Runs the real migrations against Node's built-in SQLite through a tiny adapter
-// that mimics the expo-sqlite methods we use.
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
-import type { SQLiteDatabase } from 'expo-sqlite';
+// Runs the real migrations against Node's built-in SQLite (see test-db.ts).
 import { describe, expect, it } from 'vitest';
 
 import { BUILT_IN_EXERCISES, BUILT_IN_WORKOUTS } from '@/data/library';
 import { estimateSetSec } from '@/lib/timer';
 
 import { MIGRATIONS, migrate } from './migrations';
-
-function openDb() {
-  const raw = new DatabaseSync(':memory:');
-  const args = (params: unknown[]) => (Array.isArray(params[0]) ? params[0] : params) as SQLInputValue[];
-  const db = {
-    execAsync: async (sql: string) => void raw.exec(sql),
-    runAsync: async (sql: string, ...params: unknown[]) => raw.prepare(sql).run(...args(params)),
-    getAllAsync: async (sql: string, ...params: unknown[]) => raw.prepare(sql).all(...args(params)),
-    getFirstAsync: async (sql: string, ...params: unknown[]) => raw.prepare(sql).get(...args(params)) ?? null,
-    withTransactionAsync: async (task: () => Promise<void>) => {
-      raw.exec('BEGIN');
-      try {
-        await task();
-        raw.exec('COMMIT');
-      } catch (e) {
-        raw.exec('ROLLBACK');
-        throw e;
-      }
-    },
-  };
-  return { raw, db: db as unknown as SQLiteDatabase };
-}
+import { openDb } from './test-db';
 
 describe('migrations', () => {
   it('creates and seeds a fresh database', async () => {

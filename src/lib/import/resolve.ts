@@ -10,6 +10,8 @@ import { importFileSchema, type ImportFile } from './schema';
 export interface ImportContext {
   exercises: Exercise[];
   workouts: Workout[];
+  /** Existing plans, so a file with a matching planId can update one in place. */
+  plans?: { id: string; name: string }[];
 }
 
 export interface PreviewSession {
@@ -32,8 +34,12 @@ export interface ImportPreview {
   plan: { name: string; description: string; goal: string; startDate: string | null } | null;
   newExercises: Exercise[];
   newWorkouts: Workout[];
+  /** Workouts in the file whose id already exists: saved over the existing one. */
+  updatedWorkouts: Workout[];
   blocks: PreviewBlock[];
   warnings: string[];
+  /** The existing plan this file is an update of, if any. */
+  updatePlan: { id: string; name: string } | null;
 }
 
 export type ImportResult = { ok: true; preview: ImportPreview } | { ok: false; errors: string[] };
@@ -157,8 +163,11 @@ export function resolveImport(file: ImportFile, ctx: ImportContext): ImportResul
     return created.id;
   };
 
-  const newWorkouts: Workout[] = file.workouts.map((fw) => ({
-    id: newId('wo-'),
+  // A workout whose id already exists (e.g. exported with a plan for Claude to
+  // edit) updates that workout; anything else is new.
+  const existingWorkoutById = new Map(ctx.workouts.map((w) => [w.id, w]));
+  const resolvedWorkouts: Workout[] = file.workouts.map((fw) => ({
+    id: existingWorkoutById.has(fw.id) ? fw.id : newId('wo-'),
     name: fw.name,
     focus: fw.focus,
     description: fw.description,
@@ -170,14 +179,17 @@ export function resolveImport(file: ImportFile, ctx: ImportContext): ImportResul
     })),
   }));
 
+  const newWorkouts = resolvedWorkouts.filter((w) => !existingWorkoutById.has(w.id));
+  const updatedWorkouts = resolvedWorkouts.filter((w) => existingWorkoutById.has(w.id));
+
   const fileWorkoutIds = new Map<string, string>();
   file.workouts.forEach((fw, i) => {
-    fileWorkoutIds.set(fw.id, newWorkouts[i].id);
-    if (!fileWorkoutIds.has(fw.name)) fileWorkoutIds.set(fw.name, newWorkouts[i].id);
+    fileWorkoutIds.set(fw.id, resolvedWorkouts[i].id);
+    if (!fileWorkoutIds.has(fw.name)) fileWorkoutIds.set(fw.name, resolvedWorkouts[i].id);
   });
   const workoutsByNorm = new Map<string, string>();
   for (const w of ctx.workouts) workoutsByNorm.set(norm(w.name), w.id);
-  for (const w of newWorkouts) workoutsByNorm.set(norm(w.name), w.id);
+  for (const w of resolvedWorkouts) workoutsByNorm.set(norm(w.name), w.id);
   const existingWorkoutIds = new Set(ctx.workouts.map((w) => w.id));
 
   const resolveWorkout = (ref: string): string | undefined =>
@@ -225,5 +237,10 @@ export function resolveImport(file: ImportFile, ctx: ImportContext): ImportResul
     plan = { name: file.plan.name, description: file.plan.description, goal: file.plan.goal, startDate };
   }
 
-  return { ok: true, preview: { plan, newExercises, newWorkouts, blocks, warnings } };
+  const updatePlan = (file.planId && ctx.plans?.find((p) => p.id === file.planId)) || null;
+  if (file.planId && !updatePlan) {
+    warnings.push('This file updates a plan that isn’t on this device, so it will be imported as a new plan.');
+  }
+
+  return { ok: true, preview: { plan, newExercises, newWorkouts, updatedWorkouts, blocks, warnings, updatePlan } };
 }

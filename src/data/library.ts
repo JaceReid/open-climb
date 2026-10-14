@@ -221,6 +221,18 @@ export const BUILT_IN_EXERCISES: Exercise[] = [
     defaults: { sets: 4, reps: 1, setRestSec: 180 },
   }),
 
+  ex({
+    id: 'open-climbing',
+    name: 'Open Climbing',
+    category: 'other',
+    type: 'technique',
+    description: 'A normal climbing session: projecting, mileage or a day at the crag. Log where and what you climbed.',
+    instructions:
+      'Add an entry for each part of the session (e.g. 60 min indoor bouldering, then 30 min of routes) with where you climbed, what kind and for how long.',
+    tracks: ['location', 'discipline', 'duration'],
+    defaults: { sets: 1, reps: 1, workSec: 3600 },
+  }),
+
   // Campus --------------------------------------------------------------------
   ex({
     id: 'campus-ladders',
@@ -599,6 +611,13 @@ export const BUILT_IN_WORKOUTS: Workout[] = [
     focus: 'Core',
     description: 'Body tension for steep climbing.',
     items: [item('hanging-leg-raises'), item('front-lever'), item('hollow-body'), item('ab-wheel')],
+  }),
+  wo({
+    id: 'wo-open-climbing',
+    name: 'Climbing Session',
+    focus: 'Climbing',
+    description: 'Just climbing: indoors or out, routes or boulders.',
+    items: [item('open-climbing')],
   }),
   // Max tests: starting one opens the test flow for its testable exercises;
   // the other items are the warm-up.

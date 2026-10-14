@@ -398,6 +398,40 @@ export function Field({
   );
 }
 
+/** Comma-separated list input ("half crimp, front three"). Keeps the raw text while typing. */
+export function ListField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  hint,
+}: {
+  label: string;
+  value: string[] | undefined;
+  onChange: (v: string[] | undefined) => void;
+  placeholder?: string;
+  hint?: string;
+}) {
+  const [text, setText] = useState(() => (value ?? []).join(', '));
+  return (
+    <Field
+      label={label}
+      value={text}
+      placeholder={placeholder}
+      hint={hint}
+      autoCapitalize="none"
+      onChangeText={(t) => {
+        setText(t);
+        const list = t
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
+        onChange(list.length ? list : undefined);
+      }}
+    />
+  );
+}
+
 /** Numeric input that keeps the raw text while typing and reports a number or undefined. */
 export function NumberField({
   label,

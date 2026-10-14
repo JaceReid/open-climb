@@ -3,6 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { ClaudeReviewCard } from '@/components/claude-review';
 import { Badge, Button, Card, Empty, Field, IconButton, Loading, Row, Screen, Section, T } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import {
@@ -160,6 +161,8 @@ export default function PlanScreen() {
         })}
         <Button title="Add block" icon="plus" variant="tonal" onPress={newBlock} />
       </Section>
+
+      <ClaudeReviewCard planId={plan.id} />
 
       <PlanDetails key={plan.id} plan={plan} />
 
